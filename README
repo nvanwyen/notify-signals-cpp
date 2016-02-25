@@ -1,0 +1,160 @@
+This project shows how boost:::signals2 was used to create a wrapper for
+Linux inotify events and boost::filesystem for directory polling
+
+The use is pretty simple:
+
+    declare one or both of the directory::monitor or directory::polling,
+    along with the slot connection objects. Then add one or more directories
+    using add(). Finally, define a callback handler to receive the messages as
+    the are encountered.
+
+    void handler( mti::audit::shield::directory::monitor::messages msg )
+    void handler( mti::audit::shield::directory::polling::messages msg )
+
+    These will be used for the messages returned from each of the classes
+
+Examples (see main.cpp)
+
+    test_monitor
+    ----------------------------------------------------------------------------
+    class test_monitor
+    {
+        public:
+            test_monitor()
+                : con_( dir_.connect( boost::bind( &test_monitor::handler,
+                                                   this, 
+                                                   _1 ) ) ) {}
+            virtual ~test_monitor() { con_.disconnect(); }
+
+            //
+            void add( directories dir )
+            {
+                using namespace mti::audit::shield::directory;
+
+                for ( directories::iterator d = dir.begin();
+                      d != dir.end(); 
+                      ++d )
+                    dir_.add_directory( (*d), 
+                                        monitor::filter(
+                                        monitor::event_close_write ) );
+            }
+
+            //
+            void start() { dir_.start(); }
+            void stop()  { dir_.stop();  }
+            void join()  { dir_.join();  }
+
+        protected:
+        private:
+            //
+            void handler( mti::audit::shield::directory::monitor::messages msg )
+            {
+                using namespace mti::audit::shield::directory;
+
+                typedef monitor::messages::iterator iter;
+
+                for ( iter m = msg.begin(); m != msg.end(); ++m )
+                {
+                    std::cout << "Monitor: " << (*m).name 
+                              << " ; event: " << (*m).match.event 
+                              << std::endl;
+                }
+            }
+
+            //
+            mti::audit::shield::directory::monitor             dir_;
+            mti::audit::shield::directory::monitor::connection con_;
+    };
+
+    test_polling
+    ----------------------------------------------------------------------------
+    class test_polling
+    {
+        public:
+            test_polling()
+                : con_( dir_.connect( boost::bind( &test_polling::handler, 
+                                                   this,
+                                                   _1 ) ) ) {}
+            virtual ~test_polling() { con_.disconnect(); }
+
+            //
+            void add( directories dir )
+            {
+                using namespace mti::audit::shield::directory;
+
+                for ( directories::iterator d = dir.begin(); d != dir.end(); ++d )
+                    dir_.add_directory( (*d),
+                                        polling::filter(),
+                                        300000 /* = 300 sec = 5 minutes */ );
+            }
+
+            //
+            void start() { dir_.start(); }
+            void stop()  { dir_.stop();  }
+            void join()  { dir_.join();  }
+
+        protected:
+        private:
+            //
+            void handler( mti::audit::shield::directory::polling::messages msg )
+            {
+                using namespace mti::audit::shield::directory;
+
+                typedef polling::messages::iterator iter;
+
+                for ( iter m = msg.begin(); m != msg.end(); ++m )
+                {
+                    std::cout << "Polling: " << (*m).name 
+                              //<< " ; matches: " << (*m).match.name 
+                              << std::endl;
+                }
+            }
+
+            //
+            mti::audit::shield::directory::polling             dir_;
+            mti::audit::shield::directory::polling::connection con_;
+    };
+
+    usage
+    ----------------------------------------------------------------------------
+    int main( int argc, char** argv )
+    {
+        //
+        if ( argc < 2 )
+        {
+            std::cerr << "Usage: " << argv[ 0 ]
+                                   << " <file-list> ..."
+                                   << std::endl;
+            exit( 1 );
+        }
+
+        directories dir;
+        class test_monitor test_monitor;
+        class test_polling test_polling;
+
+        for ( int i = 1; i < argc; ++i )
+            dir.push_back( argv[ i ] );
+
+        if ( dir.size() > 0 )
+        {
+            test_monitor.add( dir );
+            test_monitor.start();
+
+            test_polling.add( dir );
+            test_polling.start();
+        }
+        
+        test_monitor.join();
+        test_polling.join();
+
+        return 0;
+    }
+
+That's it. Should be pretty simple and straight forward. I know it's not the most elegant
+way to do business, nor is it asynchronous, like using ASIO, but nevertheless it's useful
+and works well.
+
+If you have any suggestions, changes or comments please feel free to reach out.
+
+Thank you
+
