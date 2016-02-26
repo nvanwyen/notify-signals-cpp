@@ -6,6 +6,8 @@
 //
 #include <boost/bind.hpp>
 #include <boost/signals2.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 //
 #include "dir.hpp"
@@ -29,9 +31,10 @@ class test_monitor
         }
 
         //
-        void start() { dir_.start(); }
-        void stop()  { dir_.stop();  }
-        void join()  { dir_.join();  }
+        void start()     { dir_.start();     }
+        void stop()      { dir_.stop();      }
+        void join()      { dir_.join();      }
+        void interrupt() { dir_.interrupt(); }
 
     protected:
     private:
@@ -72,9 +75,10 @@ class test_polling
         }
 
         //
-        void start() { dir_.start(); }
-        void stop()  { dir_.stop();  }
-        void join()  { dir_.join();  }
+        void start()     { dir_.start();     }
+        void stop()      { dir_.stop();      }
+        void join()      { dir_.join();      }
+        void interrupt() { dir_.interrupt(); }
 
     protected:
     private:
@@ -128,9 +132,10 @@ class test_moniker
         }
 
         //
-        void start() { mon_.object.start(); pol_.object.start(); }
-        void stop()  { mon_.object.stop();  pol_.object.stop();  }
-        void join()  { mon_.object.join();  pol_.object.join();  }
+        void start()     { mon_.object.start();     pol_.object.start();     }
+        void stop()      { mon_.object.stop();      pol_.object.stop();      }
+        void join()      { mon_.object.join();      pol_.object.join();      }
+        void interrupt() { mon_.object.interrupt(); pol_.object.interrupt(); }
 
     protected:
     private:
@@ -142,7 +147,6 @@ class test_moniker
             for ( iter m = msg.begin(); m != msg.end(); ++m )
             {
                 std::cout << "Moniker (events): " << (*m).name 
-                          //<< " ; matches: " << (*m).match.name 
                           << " ; event: " << (*m).match.event 
                           << std::endl;
             }
@@ -156,7 +160,6 @@ class test_moniker
             for ( iter m = msg.begin(); m != msg.end(); ++m )
             {
                 std::cout << "Moniker (polled): " << (*m).name 
-                          //<< " ; matches: " << (*m).match.name 
                           << std::endl;
             }
         }
@@ -167,12 +170,26 @@ class test_moniker
 };
 
 //
+void interruption( test_monitor* mon, test_polling* pol, test_moniker* bag )
+{
+    std::cout << "entering interruption thread" << std::endl;
+
+    // in 2 minutes, interrupt the object and stop
+    boost::this_thread::sleep( boost::posix_time::seconds( 15 ) );
+
+    std::cout << "interruptiing objects" << std::endl;
+    mon->stop();
+    pol->stop();
+    bag->stop();
+}
+
+//
 int main( int argc, char** argv )
 {
     //
     if ( argc < 2 )
     {
-        std::cerr << "Usage: " << argv[ 0 ] << " <file-list> ..." << std::endl;
+        std::cerr << "Usage: " << argv[ 0 ] << " <[directory|file]-list> ..." << std::endl;
         exit( 1 );
     }
 
@@ -186,19 +203,25 @@ int main( int argc, char** argv )
 
     if ( dir.size() > 0 )
     {
-        //test_monitor.add( dir );
+        //test_monitor.add( dir );  // indivdual test
         //test_monitor.start();
 
-        //test_polling.add( dir );
+        //test_polling.add( dir );  // indivdual test
         //test_polling.start();
 
-        test_moniker.add( dir );
+        test_moniker.add( dir );    // collective test
         test_moniker.start();
     }
-    
+
+    boost::thread pardon( &interruption, &test_monitor, &test_polling, &test_moniker );
+   
+    std::cout << "joining indivdual objects" << std::endl;
     test_monitor.join();
     test_polling.join();
     test_moniker.join();
+
+    std::cout << "joining interruption thread" << std::endl;
+    pardon.join();
 
     return 0;
 }

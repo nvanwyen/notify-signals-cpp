@@ -30,6 +30,8 @@
 #include <boost/function.hpp>
 #include <boost/signals2.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/thread/locks.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 // local
 
@@ -230,6 +232,7 @@ class monitor
         volatile bool       run_;
         boost::mutex        mutex_;
         int                 fd_;
+        std::vector<int>    wd_;
         queryset            query_;
         boost::thread_group pool_;
 

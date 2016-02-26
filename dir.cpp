@@ -47,10 +47,11 @@ namespace directory {
 //
 void monitor::add_directory( std::string dir, monitor::filter match /*= monitor::filter()*/ )
 {
+    boost::mutex::scoped_lock lock( mutex_ );
+
     if ( ! boost::filesystem::is_directory( dir ) ) 
         throw std::invalid_argument( "monitor::add_directory: " + dir + " is not a valid directory entry" ); 
 
-    boost::mutex::scoped_lock lock( mutex_ );
     query_.insert( query( dir, match ) );
 }
 
@@ -76,6 +77,19 @@ void monitor::start()
 void monitor::stop()
 {
     run_ = false;
+
+    if ( fd_ != NONE )
+    {
+        boost::mutex::scoped_lock lock( mutex_ );
+
+        // stop inotify_read()
+        for ( std::vector<int>::iterator wd = wd_.begin(); wd != wd_.end(); ++wd )
+            ::inotify_rm_watch( fd_, *wd );
+
+        wd_.clear();
+        ::close( fd_ );
+    }
+
     interrupt();
     join();
 }
@@ -114,12 +128,19 @@ void monitor::work( monitor::query& dir )
     
             while ( run_ )
             {
+                int wd;
+
                 //
                 msg.clear();
     
                 //
-                if ( ::inotify_add_watch( fd_, dir.path.c_str(), (uint32_t)(dir.match.event) ) >= 0 )
+                if ( ( wd = ::inotify_add_watch( fd_, dir.path.c_str(), (uint32_t)(dir.match.event) ) ) >= 0 )
                 {
+                    {
+                        boost::mutex::scoped_lock lock( mutex_ );
+                        wd_.push_back( wd );
+                    }
+
                     size_t len, i = 0;
                     char buff[ MONITOR_BUFFER ] = {0};
     
@@ -128,7 +149,7 @@ void monitor::work( monitor::query& dir )
     
                     //
                     i = 0;
-                    while ( i < len )
+                    while ( ( i < len ) && ( run_ ) )
                     {
                         struct inotify_event *pevent = ( struct inotify_event*)&buff[ i ];
     
@@ -234,10 +255,11 @@ bool monitor::connected()
 //
 void polling::add_directory( std::string dir, polling::filter match /*= polling::filter()*/, size_t ms /*= 0*/ )
 {
+    boost::mutex::scoped_lock lock( mutex_ );
+
     if ( ! boost::filesystem::is_directory( dir ) ) 
         throw std::invalid_argument( "polling::add_directory: " + dir + " is not a valid directory entry" ); 
 
-    boost::mutex::scoped_lock lock( mutex_ );
     query_.insert( query( dir, match, ms ) );
 }
 
