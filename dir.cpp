@@ -44,6 +44,26 @@ namespace directory {
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+monitor::monitor()
+    : run_( false ),
+      fd_( NONE )
+{
+}
+
+//
+monitor::monitor( const monitor::slot_t& handler )
+    : run_( false ),
+      fd_( NONE )
+{
+    con_ = sig_.connect( handler );
+}
+
+//
+monitor::~monitor()
+{
+    con_.disconnect();
+}
+
 //
 void monitor::add_directory( std::string dir, monitor::filter match /*= monitor::filter()*/ )
 {
@@ -83,7 +103,7 @@ void monitor::stop()
         boost::mutex::scoped_lock lock( mutex_ );
 
         // stop inotify_read()
-        for ( std::vector<int>::iterator wd = wd_.begin(); wd != wd_.end(); ++wd )
+        for ( std::vector<HANDLE>::iterator wd = wd_.begin(); wd != wd_.end(); ++wd )
             ::inotify_rm_watch( fd_, *wd );
 
         wd_.clear();
@@ -95,9 +115,9 @@ void monitor::stop()
 }
 
 //
-boost::signals2::connection monitor::connect( const signal_t::slot_type& handler )
+monitor::connection monitor::connect( const monitor::slot_t& handler )
 {
-    return sig_.connect( handler );
+    return ( con_ = sig_.connect( handler ) );
 }
 
 //
@@ -128,7 +148,7 @@ void monitor::work( monitor::query& dir )
     
             while ( run_ )
             {
-                int wd;
+                HANDLE wd;
 
                 //
                 msg.clear();
@@ -252,6 +272,24 @@ bool monitor::connected()
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+polling::polling()
+    : run_( false )
+{
+}
+
+//
+polling::polling( const polling::slot_t& handler )
+    : run_( false )
+{
+    con_ = sig_.connect( handler );
+}
+
+//
+polling::~polling()
+{
+    con_.disconnect();
+}
+
 //
 void polling::add_directory( std::string dir, polling::filter match /*= polling::filter()*/, size_t ms /*= 0*/ )
 {
@@ -303,9 +341,9 @@ void polling::join()
 
 
 //
-boost::signals2::connection polling::connect( const signal_t::slot_type& handler )
+polling::connection polling::connect( const polling::slot_t& handler )
 {
-    return sig_.connect( handler );
+    return ( con_ = sig_.connect( handler ) );
 }
 
 //

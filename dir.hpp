@@ -48,6 +48,8 @@
 #define NONE 0
 #endif
 
+#define HANDLE int
+
 //
 namespace mti { namespace audit { namespace shield {
 
@@ -199,10 +201,12 @@ class monitor
 
         //
         typedef boost::signals2::signal<void (messages)> signal_t;
+        typedef signal_t::slot_type slot_t;
 
         //
-        monitor() : run_( false ), fd_( NONE ) {}
-        virtual ~monitor() {}
+        monitor();
+        monitor( const slot_t& handler );
+        virtual ~monitor();
 
         //
         void add_directory( std::string dir, filter match = filter() );
@@ -217,7 +221,7 @@ class monitor
         void join();
 
         //
-        boost::signals2::connection connect( const signal_t::slot_type& handler );
+        connection connect( const slot_t& handler );
 
     protected:
     private:
@@ -231,13 +235,14 @@ class monitor
         //
         volatile bool       run_;
         boost::mutex        mutex_;
-        int                 fd_;
-        std::vector<int>    wd_;
+        HANDLE              fd_;
+        std::vector<HANDLE> wd_;
         queryset            query_;
         boost::thread_group pool_;
 
         //
         signal_t            sig_;
+        connection          con_;        
 };
 
 //
@@ -332,11 +337,12 @@ class polling
 
         //
         typedef boost::signals2::signal<void (messages)> signal_t;
-
+        typedef signal_t::slot_type slot_t;
 
         //
-        polling() : run_ ( false ) {}
-        virtual ~polling() {}
+        polling();
+        polling( const slot_t& handler );
+        virtual ~polling();
 
         //
         void add_directory( std::string dir, filter match = filter(), size_t ms = 0 );
@@ -351,7 +357,7 @@ class polling
         void join();
 
         //
-        boost::signals2::connection connect( const signal_t::slot_type& handler );
+        connection connect( const slot_t& handler );
 
     protected:
     private:
@@ -372,18 +378,19 @@ class polling
 
         //
         signal_t                  sig_;
+        connection                con_;
 };
 
 //
 typedef boost::shared_ptr<monitor> monitor_ptr;
 typedef boost::shared_ptr<polling> polling_ptr;
 
-// moniker class for encapsulting an object and a connection togther
+// moniker class for encapsulting an object and connection
 template <typename T>
 struct bag
 {
     T object;
-    typename T::connection connection;
+    typename T::connection signal;
 };
 
 }   // namespace mti::audit::shield::directory
