@@ -385,14 +385,6 @@ class polling
 typedef boost::shared_ptr<monitor> monitor_ptr;
 typedef boost::shared_ptr<polling> polling_ptr;
 
-// moniker class for encapsulting an object and connection
-template <typename T>
-struct bag
-{
-    T object;
-    typename T::connection signal;
-};
-
 }   // namespace mti::audit::shield::directory
 
 }}} // namespace mti::audit::shield
